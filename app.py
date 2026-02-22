@@ -7,7 +7,8 @@ from sklearn.linear_model import LogisticRegression
 import pickle
 
 # Load dataset
-df = pd.read_csv('/content/archive/combined_emotion.csv')
+df = pd.read_csv('combined_emotion.csv')
+
 
 # Clean function
 def clean_text(text):
