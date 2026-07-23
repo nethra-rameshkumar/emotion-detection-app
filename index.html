@@ -1,0 +1,218 @@
+import streamlit as st
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.linear_model import LogisticRegression
+from sklearn.pipeline import Pipeline
+from sklearn.metrics import accuracy_score
+
+st.set_page_config(page_title="Emotions", layout="wide")
+
+# ---------------- TRAIN MODEL USING YOUR DATASET ----------------
+@st.cache_resource
+def train_model():
+    df = pd.read_csv("combined_emotion.csv")
+    df.dropna(inplace=True)
+
+    X = df["sentence"]
+    y = df["emotion"]
+
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, random_state=42
+    )
+
+    model = Pipeline([
+        ("tfidf", TfidfVectorizer(stop_words="english")),
+        ("clf", LogisticRegression(max_iter=3000))
+    ])
+
+    model.fit(X_train, y_train)
+
+    accuracy = accuracy_score(y_test, model.predict(X_test))
+    return model, accuracy
+
+model, accuracy = train_model()
+
+# ---------------- SESSION STATE ----------------
+if "page" not in st.session_state:
+    st.session_state.page = "login"
+
+if "history" not in st.session_state:
+    st.session_state.history = []
+
+# ---------------- LOGIN PAGE (UNCHANGED) ----------------
+if st.session_state.page == "login":
+
+    st.markdown("""
+    <style>
+    .stApp {
+        background-image: url("https://images.unsplash.com/photo-1519389950473-47ba0277781c");
+        background-size: cover;
+        background-position: center;
+        background-attachment: fixed;
+    }
+
+    .block-container {
+        background: rgba(0, 0, 0, 0.75);
+        padding: 3rem;
+        border-radius: 15px;
+        color: white;
+        max-width: 450px;
+        margin: auto;
+        margin-top: 6%;
+    }
+
+    input {
+        background-color: #1e1e1e !important;
+        color: white !important;
+    }
+
+    .app-title {
+        text-align: center;
+        font-size: 35px;
+        font-weight: bold;
+        margin-bottom: 10px;
+    }
+    .title-container{
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    }
+                
+    .logo {
+        font-size: 35px;
+    }
+    
+    .app-title{
+    font-size: 35px;
+    font-weight: bold;
+    }
+                
+    </style>
+    """, unsafe_allow_html=True)
+
+    st.markdown('''
+<div class="title-container">
+    <div class="logo">🎭</div>
+    <div class="app-title">Emotions</div>
+</div>
+''', unsafe_allow_html=True)
+
+    st.title("🔐 Welcome Back")
+    st.write("Login to continue")
+
+    username = st.text_input("Username")
+    password = st.text_input("Password", type="password")
+
+    col1, col2 = st.columns([1,1])
+
+    with col1:
+        if st.button("Login"):
+            if username == "admin" and password == "1234":
+                st.session_state.page = "dashboard"
+                st.session_state.user = username
+                st.rerun()
+            else:
+                st.error("Invalid Credentials")
+
+    with col2:
+        if st.button("Forgot Password"):
+            st.info("Contact admin to reset your password.")
+
+# ---------------- DASHBOARD (SAME DESIGN, NEW MODEL) ----------------
+elif st.session_state.page == "dashboard":
+
+    st.markdown("""
+    <style>
+    .stApp {
+        background-color: #121212;
+        color: white;
+    }
+
+    .navbar {
+        background-color: white;
+        padding: 15px 25px;
+        border-radius: 10px;
+        margin-bottom: 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .navbar h2 {
+        color: black;
+        margin: 0;
+    }
+
+    .card {
+        background-color: #1e1e1e;
+        padding: 25px;
+        border-radius: 15px;
+        margin-top: 20px;
+        text-align: center;
+    }
+
+    textarea, input {
+        background-color: #2c2c2c !important;
+        color: white !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+    # Navbar
+    st.markdown(f"""
+    <div class="navbar">
+        <h2>🎭 Emotions Dashboard</h2>
+        <div style="color:black;">👋 Hello, {st.session_state.user}</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    st.success(f"Model Accuracy: {round(accuracy*100,2)}%")
+
+    st.subheader("🤖 Emotion Prediction")
+
+    text = st.text_area("Enter your text")
+
+    if st.button("Predict"):
+
+        if text.strip() != "":
+            with st.spinner("Analyzing Emotion..."):
+                predicted_emotion = model.predict([text])[0]
+
+                # Confidence from probabilities
+                probs = model.predict_proba([text])[0]
+                confidence = round(max(probs) * 100)
+
+            st.session_state.history.append(predicted_emotion)
+
+            st.markdown(f"""
+            <div class="card">
+                <h3 style="color:#00ffcc;">Predicted Emotion</h3>
+                <h1>{predicted_emotion.upper()}</h1>
+                <p>Confidence: {confidence}%</p>
+            </div>
+            """, unsafe_allow_html=True)
+
+            st.progress(confidence / 100)
+
+            st.download_button(
+                "📥 Download Result",
+                data=f"Emotion: {predicted_emotion}\nConfidence: {confidence}%",
+                file_name="emotion_result.txt"
+            )
+        else:
+            st.warning("Enter some text.")
+
+    # History + Chart (UNCHANGED)
+    if st.session_state.history:
+        st.subheader("📜 Prediction History")
+        st.write(st.session_state.history)
+
+        data = pd.Series(st.session_state.history).value_counts()
+        st.subheader("📊 Emotion Distribution")
+        st.bar_chart(data)
+
+    if st.button("Logout"):
+        st.session_state.page = "login"
+        st.rerun()
