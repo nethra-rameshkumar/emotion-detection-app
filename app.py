@@ -71,7 +71,7 @@ st.markdown("""
 @st.cache_data
 def load_data():
 
-    df = pd.read_csv("combined_emotion.csv")
+    df = pd.read_csv("combined_emotionn.csv")
 
     return df
 
