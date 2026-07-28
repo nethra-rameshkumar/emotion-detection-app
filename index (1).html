@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Emotions | AI Emotion Detection</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:linear-gradient(135deg,#eef2ff,#f8fafc);color:#172033}
+.wrap{max-width:1050px;margin:auto;padding:35px 20px}.hero{text-align:center;margin-bottom:25px}
+.logo{font-size:52px}.hero h1{font-size:42px;margin:5px}.hero p{color:#64748b;font-size:18px}
+.card{background:#fff;border-radius:22px;padding:28px;box-shadow:0 10px 35px #00000012;margin:20px 0}
+.metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:15px}.metric{text-align:center;background:#f8fafc;border-radius:16px;padding:18px}.metric b{display:block;font-size:25px;margin-top:5px}
+textarea{width:100%;min-height:140px;padding:16px;border:1px solid #d8dee9;border-radius:14px;font-size:16px;resize:vertical}
+button{width:100%;margin-top:15px;padding:15px;border:0;border-radius:13px;background:#4f46e5;color:#fff;font-size:17px;font-weight:bold;cursor:pointer}
+button:hover{opacity:.9}.result{text-align:center;background:#eef2ff;border-radius:18px;padding:25px;margin-top:20px}
+.result h2{margin:0;color:#4f46e5}.emotion{font-size:36px;font-weight:bold;margin:10px}
+.history{width:100%;border-collapse:collapse;margin-top:10px}.history th,.history td{padding:10px;border-bottom:1px solid #e5e7eb;text-align:left}
+@media(max-width:700px){.metrics{grid-template-columns:1fr}.hero h1{font-size:32px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<div class="hero"><div class="logo">🎭</div><h1>Emotions</h1><p>AI-Based Emotion Detection from Text</p></div>
+<div class="metrics">
+<div class="metric">📊 Model Accuracy<b id="accuracy">Loading...</b></div>
+<div class="metric">🤖 Model<b>Logistic Regression</b></div>
+<div class="metric">🎭 Emotions<b>6</b></div>
+</div>
+<div class="card">
+<h2>🤖 Emotion Prediction</h2>
+<p>Enter a sentence and let the trained machine-learning model predict the emotion.</p>
+<textarea id="text" placeholder="Example: I am very happy today!"></textarea>
+<button onclick="predict()">🔮 Predict Emotion</button>
+<div id="result"></div>
+</div>
+<div class="card">
+<h2>📝 Prediction History</h2>
+<table class="history"><thead><tr><th>Text</th><th>Emotion</th><th>Confidence</th></tr></thead>
+<tbody id="history"><tr><td colspan="3">No predictions yet.</td></tr></tbody></table>
+</div>
+</div>
+<script>
+let M=null, history=[];
+async function loadModel(){const r=await fetch("model.json");M=await r.json();document.getElementById("accuracy").textContent=(M.accuracy*100).toFixed(2)+"%";}
+loadModel().catch(()=>document.getElementById("accuracy").textContent="Model error");
+function cleanText(s){return s.toLowerCase().replace(/[^a-zA-Z ]/g,"");}
+function predict(){
+if(!M){alert("Model is still loading. Please try again.");return}
+const raw=document.getElementById("text").value.trim();
+if(!raw){alert("Please enter some text.");return}
+const words=cleanText(raw).split(/\s+/).filter(Boolean), total=words.length, counts={};
+words.forEach(w=>{if(M.vocabulary[w]!==undefined)counts[w]=(counts[w]||0)+1});
+const scores=M.intercept.slice();
+for(const w in counts){const idx=M.vocabulary[w], value=(counts[w]/total)*M.idf[idx];
+for(let c=0;c<M.classes.length;c++)scores[c]+=value*M.coef[c][idx];}
+const max=Math.max(...scores), ex=scores.map(x=>Math.exp(x-max)), sum=ex.reduce((a,b)=>a+b,0), probs=ex.map(x=>x/sum);
+let best=0;for(let i=1;i<probs.length;i++)if(probs[i]>probs[best])best=i;
+const emotion=M.classes[best], confidence=probs[best]*100;
+document.getElementById("result").innerHTML=`<div class="result"><h2>🎭 Predicted Emotion</h2><div class="emotion">${emotion.toUpperCase()}</div><div>Confidence: ${confidence.toFixed(2)}%</div></div>`;
+history.unshift({text:raw,emotion:emotion,confidence:confidence.toFixed(2)+"%"});renderHistory();
+}
+function renderHistory(){document.getElementById("history").innerHTML=history.map(x=>`<tr><td>${escapeHtml(x.text)}</td><td>${x.emotion}</td><td>${x.confidence}</td></tr>`).join("");}
+function escapeHtml(s){return s.replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]));}
+</script>
+</body>
+</html>
